@@ -1,0 +1,109 @@
+---
+title: "R-programming Project - Analysis and Prediction of Airbnb Listing Prices"
+author: "Nived Suresan"
+date: "2023-07-07"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The goal of this project is to perform an exploratory data analysis (EDA) and predictive modelling on Airbnb listing data using the R programming language. The project will encompass all stages of the data science lifecycle, from data import and cleaning to visualisation and modelling. 
+
+## Data Loading
+```{r}
+library(dplyr)
+library(caret)
+library(tinytex)
+
+#read the data
+data = read.csv("C:/Users/Nived/Downloads/listings.csv~1/listings1.csv")
+
+```
+
+## Data Tidying
+
+```{r}
+#2. removing unwanted columns from the data for analysis
+data = data[,c('neighbourhood','room_type','latitude','longitude','accommodates','bedrooms','beds','price','review_scores_rating','reviews_per_month')]
+
+#3. converting the price column which is a string into an integer
+data$price = gsub("\\$","",data$price)
+data$price <- as.integer(data$price)
+```
+
+## Data Exploration
+
+```{r}
+#summarize the data
+summary(data)
+```
+
+## Feature engineering
+
+```{r}
+data = data %>% 
+  mutate(price_per_person = price %/% accommodates) %>%
+  mutate(beds_per_room = beds %/% bedrooms) %>%
+  mutate(beds_group = case_when(
+    beds_per_room == 1 ~ "Single bed",
+    beds_per_room == 2 ~ "Double bed",
+    beds_per_room >= 3 ~ "Multiple beds"
+  ))
+
+#finding the average price paid by the customer based the number of people staying
+avg = aggregate(data$price ~ data$accommodates, data=data,FUN=mean)
+
+room_type_freq = table(data$room_type)
+room_type_freq = data.frame(room_type_freq)
+
+#removes all rows with missing values and renaming the column names
+avg = na.omit(avg)
+colnames(avg) = c("accommodates","price")
+
+```
+
+## Bar Plot
+
+```{r}
+barplot(room_type_freq$Freq, names.arg=room_type_freq$Var1,xlab="Room Type",ylab="Frequency")
+```
+
+## Scatter Plot and Regression
+```{r}
+
+plot(avg$accommodates, avg$price, xlim=c(1,16),ylim=c(0,800), xlab ="accommodate", ylab="price")
+
+#Splitting the data into training set and testing set
+set.seed(123)
+train_index <- createDataPartition(avg$price, p = 0.7, list = FALSE)
+train_data <- avg[train_index, ]
+test_data <- avg[-train_index, ]
+
+# Build the linear regression model
+model <- lm(price ~ accommodates, data = train_data)
+
+# Make predictions on the test set
+predictions <- predict(model, newdata = test_data)
+rmse <- sqrt(mean((test_data$price - predictions)^2))
+print(rmse)
+
+abline(model,col='blue')
+
+summary(model)
+
+
+```
+
+## Conclusion
+
+The overall p-value, labeled as "Pr(>|t|)" or "Pr(>F)" in the summary output, is 0.000177. This p-value is less than 0.05, indicating that the regression model is significant. Typically, If the p-value is less than 5% or 0.05, then the model is considered significant.
+
+Moreover, the adjusted R-squared value of 0.6789 suggests that approximately 67.89% of the variance in the dependent variable in the model.This means that the price of stay can be estimated using the accommodates.
+
+Later we evaluate the RMSE value of the data set by splitting into training set and testing
+set. We then model the training set data using linear regression and predict based on this model. after finding the rmse value we get a value 30.5345 which tells us about the error of the model.This is sufficienty accurate when It comes to predicting prices.
+
